@@ -1,0 +1,9 @@
+# Exclude large directories and build artifacts
+models/
+cache/
+logs/
+.git/
+.venv/
+__pycache__/
+*.pyc
+.env
