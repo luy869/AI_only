@@ -1,0 +1,78 @@
+# ============================================================================
+# Athena — Docker Compose
+# - athena: Discord bot + Stable Diffusion (GPU 1)
+# - ollama: LLM server (GPU 0)
+# Requires: NVIDIA Container Toolkit
+# ============================================================================
+
+services:
+  # ── Ollama — LLM Server ────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: athena-ollama
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+
+    volumes:
+      - ollama_data:/root/.ollama
+
+    # No host port needed — bot connects via Docker network (ollama:11434)
+    # Uncomment if you want host access for debugging:
+    # ports:
+    #   - "11434:11434"
+
+    mem_limit: 12g
+    memswap_limit: 14g
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Athena Bot — Discord + Stable Diffusion ────────────────────────────
+  athena:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: athena-bot
+    restart: unless-stopped
+    depends_on:
+      - ollama
+
+    env_file:
+      - .env
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+
+    volumes:
+      # Generated image cache (named volume — avoids permission issues)
+      - athena_cache:/app/cache
+      # Host models (peristence for Stable Diffusion)
+      - ./models:/app/models
+
+    mem_limit: 12g
+    memswap_limit: 14g
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  ollama_data:
+  athena_cache:

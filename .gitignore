@@ -1,0 +1,32 @@
+# Models directory — downloaded separately
+models/
+!models/.gitkeep
+
+# Generated image cache
+cache/
+
+# Logs
+logs/
+
+# Environment secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual env
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
