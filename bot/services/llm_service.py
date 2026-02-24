@@ -308,8 +308,8 @@ class LLMService:
             "messages": messages,
             "stream": False,
             "options": {
-                "num_predict": max_tokens or settings.llm_max_tokens,
-                "temperature": temperature or settings.llm_temperature,
+                "num_predict": max_tokens if max_tokens is not None else settings.llm_max_tokens,
+                "temperature": temperature if temperature is not None else settings.llm_temperature,
                 "top_p": settings.llm_top_p,
                 "repeat_penalty": settings.llm_repeat_penalty,
             },
@@ -337,7 +337,6 @@ class LLMService:
 
         # Save to history
         if not system_override:
-            history = self.get_history(user_id)
             history.add("assistant", content)
             self._save_history(user_id, history)
 

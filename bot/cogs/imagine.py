@@ -1,7 +1,7 @@
 """
 Athena — 画像生成 Cog
 
-Stable Diffusion を使ったテキストから画像生成のスラッシュコマンド。
+FLUX.1-schnell を使ったテキストから画像生成のスラッシュコマンド。
 """
 
 from __future__ import annotations
@@ -44,11 +44,11 @@ class ImagineCog(commands.Cog, name="Imagine"):
     )
     @app_commands.describe(
         prompt="生成したい内容（詳しく書くほど良い結果に！）",
-        negative_prompt="画像に含めたくない要素",
-        steps="推論ステップ数（10〜50、デフォルト25）",
-        guidance="ガイダンススケール（1〜20、デフォルト7.5）",
-        width="画像の幅 (px)（デフォルト512）",
-        height="画像の高さ (px)（デフォルト512）",
+        negative_prompt="画像に含めたくない要素（※Fluxでは効果なし）",
+        steps="推論ステップ数（1〜50、Schnellデフォルト4）",
+        guidance="ガイダンススケール（0〜20、Schnellデフォルト0.0）",
+        width="画像の幅 (px)（デフォルト1024）",
+        height="画像の高さ (px)（デフォルト1024）",
         seed="再現用シード（省略するとランダム）",
     )
     async def imagine(
@@ -56,10 +56,10 @@ class ImagineCog(commands.Cog, name="Imagine"):
         interaction: discord.Interaction,
         prompt: str,
         negative_prompt: Optional[str] = None,
-        steps: Optional[app_commands.Range[int, 10, 50]] = None,
-        guidance: Optional[app_commands.Range[float, 1.0, 20.0]] = None,
-        width: Optional[app_commands.Range[int, 256, 768]] = None,
-        height: Optional[app_commands.Range[int, 256, 768]] = None,
+        steps: Optional[app_commands.Range[int, 1, 50]] = None,
+        guidance: Optional[app_commands.Range[float, 0.0, 20.0]] = None,
+        width: Optional[app_commands.Range[int, 256, 2048]] = None,
+        height: Optional[app_commands.Range[int, 256, 2048]] = None,
         seed: Optional[int] = None,
     ) -> None:
         # レートリミット
