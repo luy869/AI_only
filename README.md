@@ -25,13 +25,13 @@
 ┌─────────────────────────────────────────┐
 │           Dual GPU Architecture         │
 ├─────────────────┬───────────────────────┤
-│  GTX 1070 (8GB) │  GTX 1660 Ti (6GB)   │
-│  CUDA:0         │  CUDA:1              │
+│  RTX 5080 (16GB)  │  RTX 3080 (10GB)      │
+│  CUDA:0           │  CUDA:1               │
 ├─────────────────┼───────────────────────┤
-│  LLM推論        │  画像生成             │
-│  Mistral-7B     │  Stable Diffusion    │
-│  GGUF Q4_K_M    │  v1.5                │
-│  ~4.5GB VRAM    │  ~4GB VRAM           │
+│  画像生成          │  LLM推論              │
+│  FLUX.1-schnell   │  Gemma 3 12B          │
+│  4-bit量子化      │  Ollama               │
+│  ~10GB VRAM       │  ~8GB VRAM            │
 └─────────────────┴───────────────────────┘
 ```
 
@@ -159,11 +159,11 @@ Discord Developer Portal → OAuth2 → URL Generator:
 |---|---|---|
 | `DISCORD_TOKEN` | — | Discord Bot Token（必須） |
 | `OWNER_ID` | — | Bot管理者のDiscord ID |
-| `LLM_GPU_DEVICE` | `0` | LLM用GPUインデックス |
-| `SD_GPU_DEVICE` | `1` | SD用GPUインデックス |
+| `SD_MODEL_ID` | `FLUX.1-schnell` | 画像生成モデルID |
+| `SD_GPU_DEVICE` | `0` | 画像生成用GPUインデックス |
 | `LLM_N_CTX` | `4096` | コンテキストウィンドウ |
 | `LLM_TEMPERATURE` | `0.7` | 生成温度 |
-| `SD_DEFAULT_STEPS` | `25` | 画像生成ステップ数 |
+| `SD_DEFAULT_STEPS` | `4` | 画像生成ステップ数 |
 | `RATE_LIMIT_PER_MINUTE` | `10` | ユーザーあたりのレート制限 |
 
 ## 🔧 トラブルシューティング

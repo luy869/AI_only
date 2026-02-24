@@ -39,7 +39,7 @@ class BotSettings(BaseSettings):
     # ── LLM (Ollama) ───────────────────────────────────────────────────────
     ollama_base_url: str = Field(
         "http://ollama:11434",
-        description="Ollama API base URL",
+        description="Ollama APIベースURL",
     )
     ollama_model: str = Field(
         "gemma3:12b-it-qat",
@@ -52,15 +52,15 @@ class BotSettings(BaseSettings):
 
     # ── Image Generation ─────────────────────────────────────────────────
     sd_model_id: str = Field(
-        "stable-diffusion-v1-5/stable-diffusion-v1-5",
-        description="Hugging Face model ID or local path for Stable Diffusion",
+        "black-forest-labs/FLUX.1-schnell",
+        description="Hugging Face モデルID（Flux / SDXL / SD）",
     )
     sd_gpu_device: int = Field(1, description="CUDA device index for SD")
-    sd_default_steps: int = Field(25, description="Default inference steps")
-    sd_default_guidance: float = Field(7.5, description="Default guidance scale")
-    sd_default_width: int = Field(512, description="Default image width")
-    sd_default_height: int = Field(512, description="Default image height")
-    sd_enable_safety: bool = Field(True, description="Enable NSFW safety checker")
+    sd_default_steps: int = Field(4, description="推論ステップ数（Schnellは4推奨）")
+    sd_default_guidance: float = Field(0.0, description="ガイダンススケール（Schnellは0.0推奨）")
+    sd_default_width: int = Field(1024, description="デフォルト画像幅")
+    sd_default_height: int = Field(1024, description="デフォルト画像高さ")
+    sd_enable_safety: bool = Field(False, description="NSFWセーフティチェッカー（Fluxでは非対応）")
     sd_model_local_path: str = Field(
         str(MODELS_DIR / "stable-diffusion-v1-5"),
         description="Local directory to cache/store SD model",

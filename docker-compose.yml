@@ -12,12 +12,15 @@ services:
     container_name: athena-ollama
     restart: unless-stopped
 
+    environment:
+      - CUDA_VISIBLE_DEVICES=1 # RTX 3080 (10GB) — LLM専用
+
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              device_ids: [ "1" ] # RTX 3080
               capabilities: [ gpu ]
 
     volumes:
@@ -49,6 +52,10 @@ services:
 
     env_file:
       - .env
+
+    environment:
+      # VRAMフラグメントによる OOM を軽減（PyTorch 2.x 推奨設定）
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
     deploy:
       resources:
