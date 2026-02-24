@@ -12,3 +12,4 @@ sentencepiece>=0.2.0
 protobuf>=3.20.0
 PyNaCl
 bitsandbytes>=0.43.0
+git+https://github.com/xinntao/Real-ESRGAN.git#egg=realesrgan

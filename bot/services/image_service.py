@@ -255,10 +255,7 @@ class ImageService:
         image: Image.Image = output.images[0]
 
         # Save to cache
-        filename = f"img_{int(time.time())}_{seed}.png"
-        save_path = Path(settings.image_cache_dir) / filename
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-        image.save(save_path)
+        save_path = self._save_image_safe(image, "img", seed)
 
         elapsed = time.perf_counter() - t0
         logger.info("Image generated in %.2fs", elapsed)
@@ -270,6 +267,121 @@ class ImageService:
             height=h,
             elapsed_seconds=elapsed,
         )
+
+    # ── Upscaling ─────────────────────────────────────────────────────────
+
+    def load_upscaler(self) -> None:
+        """Load Real-ESRGAN model for upscaling on CPU."""
+        if getattr(self, "_upscaler", None) is not None:
+            return
+
+        logger.info("Loading Real-ESRGAN upscaler on CPU ...")
+        from basicsr.archs.rrdbnet_arch import RRDBNet
+        from realesrgan import RealESRGANer
+
+        # We use the standard x4plus model
+        model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23, num_grow_ch=32, scale=4)
+        
+        # Check standard models directory
+        model_path = Path(__file__).resolve().parent.parent.parent / "models" / "RealESRGAN_x4plus.pth"
+        if not model_path.exists():
+            # Fallback URL if not pre-downloaded
+            model_path_str = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth"
+        else:
+            model_path_str = str(model_path)
+
+        self._upscaler = RealESRGANer(
+            scale=4,
+            model_path=model_path_str,
+            model=model,
+            tile=400, # Use tiling to reduce RAM consumption
+            tile_pad=10,
+            pre_pad=0,
+            half=False, # Keep float32 for CPU
+            device=torch.device("cpu") # Force CPU to save VRAM
+        )
+        logger.info("✓ Upscaler loaded on CPU")
+
+    def upscale(self, image: Image.Image, outscale: float = 2.0) -> ImageResult:
+        """
+        Upscale an image using Real-ESRGAN.
+        BLOCKING method — call via run_in_executor.
+        """
+        import numpy as np
+
+        self.load_upscaler()
+
+        t0 = time.perf_counter()
+
+        # Convert PIL Image to cv2 BGR format as required by RealESRGAN
+        img_np = np.array(image.convert("RGB"))
+        img_bgr = img_np[:, :, ::-1] # RGB to BGR
+
+        logger.info("Upscaling image (Original size: %dx%d, Scale: %.1fx) on CPU ...", 
+                    image.width, image.height, outscale)
+
+        try:
+            output_bgr, _ = self._upscaler.enhance(img_bgr, outscale=outscale)
+        except Exception as e:
+            logger.error("Upscale failed: %s", e)
+            raise RuntimeError(f"Upscale failed: {e}")
+
+        # Convert back to PIL Image (BGR to RGB)
+        output_rgb = output_bgr[:, :, ::-1]
+        output_img = Image.fromarray(output_rgb)
+
+        # Save to cache
+        seed = int(time.time() * 1000) % (2**32) # Dummy seed
+        save_path = self._save_image_safe(output_img, "upscale", seed)
+
+        elapsed = time.perf_counter() - t0
+        logger.info("Image upscaled in %.2fs (Final size: %dx%d)", 
+                    elapsed, output_img.width, output_img.height)
+
+        return ImageResult(
+            path=save_path,
+            seed=seed,
+            width=output_img.width,
+            height=output_img.height,
+            elapsed_seconds=elapsed,
+        )
+
+
+    def _save_image_safe(self, image: Image.Image, prefix: str, seed: int) -> Path:
+        """
+        Saves the image to the cache. If the PNG is larger than Discord's 10MB limit,
+        it progressively converts it to a high-quality JPEG to ensure it can be sent.
+        """
+        filename = f"{prefix}_{int(time.time())}_{seed}.png"
+        save_path = Path(settings.image_cache_dir) / filename
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Save as PNG first
+        image.save(save_path)
+
+        # Discord's default upload limit is 10MB.
+        # Use 9.5MB as safe margin to account for embed overhead.
+        DISCORD_MAX_BYTES = 9.5 * 1024 * 1024
+        file_size = save_path.stat().st_size
+
+        if file_size > DISCORD_MAX_BYTES:
+            logger.info("Image '%s' is too large (%.2f MB). Converting to JPEG...", prefix, file_size / (1024*1024))
+            save_path.unlink()  # Delete the huge PNG
+            filename = f"{prefix}_{int(time.time())}_{seed}.jpg"
+            save_path = Path(settings.image_cache_dir) / filename
+
+            # Progressively lower JPEG quality until file fits under Discord limit
+            for quality in (95, 90, 85, 80, 75, 70):
+                image.save(save_path, format="JPEG", quality=quality)
+                new_size = save_path.stat().st_size
+                logger.info("  JPEG quality=%d → %.2f MB", quality, new_size / (1024*1024))
+                if new_size <= DISCORD_MAX_BYTES:
+                    break
+            else:
+                # Even quality 70 was too large — shouldn't happen for typical images
+                logger.warning("Image still too large after quality reduction. Sending anyway.")
+
+        return save_path
 
     # ── Cache Management ──────────────────────────────────────────────────
 
@@ -291,8 +403,9 @@ class ImageService:
         ttl_seconds = int(settings.image_cache_ttl_hours) * 3600
 
         try:
-            for file_path in cache_dir.glob("*.png"):
-                if file_path.is_file():
+            # JPEGとPNGの両方をクリーンアップ対象にする
+            for file_path in cache_dir.iterdir():
+                if file_path.is_file() and file_path.suffix.lower() in [".png", ".jpg", ".jpeg"]:
                     stat = file_path.stat()
                     if now - stat.st_mtime > ttl_seconds:
                         file_path.unlink()

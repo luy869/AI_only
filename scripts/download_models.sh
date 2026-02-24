@@ -64,6 +64,22 @@ echo "         'black-forest-labs/FLUX.1-schnell', \\"
 echo "         cache_dir='/app/models')\""
 echo ""
 
+# ── 3. Real-ESRGAN ────────────────────────────────────────────────────────
+echo "── Real-ESRGAN (Upscaler) ───────────────"
+echo ""
+UP_MODEL_URL="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth"
+UP_MODEL_FILE="${MODELS_DIR}/RealESRGAN_x4plus.pth"
+
+if [ -f "$UP_MODEL_FILE" ]; then
+    echo "✓ RealESRGAN_x4plus.pth already downloaded."
+else
+    echo "⬇ Downloading RealESRGAN_x4plus.pth …"
+    curl -L -o "$UP_MODEL_FILE" "$UP_MODEL_URL"
+    echo "✓ Download complete."
+fi
+echo ""
+
+
 echo "============================================"
 echo "  ✅ Setup complete!"
 echo ""
