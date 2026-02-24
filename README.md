@@ -2,25 +2,27 @@
 
 > **完全ローカル動作** のAIアシスタントBot。外部API依存ゼロ、デュアルGPU活用、プライバシー完全保護。
 
-## ✨ 機能一覧
+## ✨ 主要機能
 
-| コマンド | 説明 |
-|---|---|
-| `/chat` | AI会話（文脈記憶付き） |
-| `/clear` | 会話履歴リセット |
-| `/code` | コードレビュー・生成・解説 |
-| `/translate` | テキスト翻訳 |
-| `/summarize` | テキスト要約 |
-| `/imagine` | テキストから画像生成 |
-| `/ping` | レイテンシ計測 |
-| `/stats` | システム統計情報 |
-| `/help` | コマンドガイド |
-| `/reload` | [Owner] Cogホットリロード |
-| `/config` | [Owner] 設定表示・変更 |
-| `/shutdown` | [Owner] 安全停止 |
+Athena はマルチモーダルなAIアシスタントとして、以下の機能を提供します。
+
+### 🗨️ AIチャット & アシスタント
+- **/chat [message]**: 文脈を記憶するAIチャット。Gemma 3 12B による高度な推論が可能。
+- **/code [prompt]**: コードの生成、レビュー、バグ修正の提案。
+- **/translate [text] [to]**: 高精度な多言語翻訳。
+- **/summarize [text]**: 長文の要約。
+
+### 🎨 画像生成 (FLUX.1)
+- **/imagine [prompt]**: 最新の **FLUX.1-schnell** モデルを使用した高品質な画像生成。
+- **🔍 拡大 (2x)**: 生成された画像の解像度を Real-ESRGAN で 2倍にアップスケールします（ボタン操作）。
+
+---
 
 ## 🏗️ アーキテクチャ
 
+デュアルGPU構成を最大限に活用し、LLMと画像生成を完全に分離して実行します。
+
+```
 ┌─────────────────────────────────────────┐
 │           Dual GPU Architecture         │
 ├─────────────────┬───────────────────────┤
@@ -33,197 +35,79 @@
 │  ~15GB VRAM       │  ~8GB VRAM            │
 │  ※VAE/CLIPはCPUへ │                       │
 └─────────────────┴───────────────────────┘
-
-
-## 📋 前提条件
-
-- **OS**: Ubuntu 20.04+ / 対応Linuxディストリビューション
-- **Docker**: 24.0+
-- **Docker Compose**: v2.0+
-- **NVIDIA Driver**: 525+ (CUDA 11.8対応)
-- **NVIDIA Container Toolkit**: インストール済み
-- **Discord Bot Token**: [Discord Developer Portal](https://discord.com/developers/applications) で取得
-
-### NVIDIA Container Toolkit インストール
-
-```bash
-# Ubuntu / Debian
-distribution=$(. /etc/os-release; echo $ID$VERSION_ID)
-curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
-  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
-sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
 ```
+
+---
+
+## � コマンドガイド
+
+### `/imagine` (画像生成)
+FLUX.1-schnell に最適化されたパラメータを使用します。
+
+- **prompt**: 生成したい画像の説明（英語推奨）。
+- **steps** (Default: 4): 拡散ステップ数。Schnellモデルは **4〜8ステップ** で十分な品質が得られます。
+- **guidance_scale** (Default: 0.0): Flux.1-schnell は **0.0** が推奨値です。
+- **width / height**: 画像サイズ。最大 1536px まで指定可能。
+- **seed**: 生成の再現性を確保するための数値。
+
+> 💡 **Tips**: 生成後に表示される「拡大 (2x)」ボタンを押すと、CPUリソースを使用して画像をより鮮明にします。
+
+### `/chat` (AI会話)
+- **文脈保持**: 過去の数ターンの会話を記憶し、自然な対話が可能です。
+- **履歴クリア**: 会話が噛み合わなくなった場合は `/clear` で履歴をリセットしてください。
+
+### `/stats` (システム情報)
+- システムの負荷状況、各GPUのVRAM使用量、モデルのロード状態をリアルタイムで確認できます。
+
+---
+
+## ⚙️ 技術的な最適化 (OOM対策済み)
+
+本プロジェクトでは、16GBのVRAMで巨大な FLUX モデルを安定動作させるために以下の高度な最適化を実装しています。
+
+1. **4-bit 量子化 (`bitsandbytes`)**: Transformer と T5 エンコーダを量子化し、VRAM消費を大幅に削減。
+2. **VAE/CLIP CPU オフロード**: デコード時にVRAMが枯渇するのを防ぐため、VAE と CLIP プロセッサを CPU (RAM) 側で実行。
+3. **bfloat16 統一**: RTX 5080 (Blackwell) に最適化されたデータ型を使用し、計算エラーとメモリオーバーヘッドを回避。
+4. **VAE Tiling & Slicing**: 巨大な画像のデコードをタイル状に分割して処理し、メモリピークを抑制。
+5. **GPU 隔離**: Docker Compose で各サービスに特定の `device_ids` を割り当て、リソース競合を完全に防止。
+
+---
 
 ## 🚀 セットアップ手順
 
-### 1. リポジトリ準備
-
+### 1. 準備
 ```bash
-cd /path/to/athena
-```
-
-### 2. 環境変数設定
-
-```bash
+git clone https://github.com/luy869/AI_only.git athena
+cd athena
 cp .env.example .env
 ```
 
-`.env` を編集して最低限以下を設定:
+### 2. 環境設定
+`.env` に Discord Bot Token を記述します。
 
-```env
-DISCORD_TOKEN=your-bot-token-here
-OWNER_ID=your-discord-user-id
-```
-
-### 3. モデルのダウンロード
-
+### 3. モデル取得 & 起動
 ```bash
+# モデルの事前ロード（初回のみ）
 chmod +x scripts/download_models.sh
 ./scripts/download_models.sh
-```
 
-> ⚠️ 約8.5GB のダウンロードが発生します。初回のみ必要です。
-
-### 4. Docker ビルド & 起動
-
-```bash
+# 起動
 docker compose up --build -d
 ```
 
-### 5. ログ確認
+---
 
-```bash
-docker compose logs -f athena
-```
+## � トラブルシューティング
 
-正常起動時のログ:
-```
-✦ Athena is online! Athena#1234 (ID: 123456789)
-  Guilds: 1
-🔄 Loading ML models in background …
-  ✓ LLM model loaded
-  ✓ Image generation model loaded
-  ✓ Queue workers started
-✅ All models loaded — Athena is fully operational
-```
+### Q: 画像生成で "CUDA out of memory" が出る
+- `athena-bot` コンテナのメモリ割り当てを確認してください。本構成では画像サイズ `1024x1024` までは安定動作を確認しています。
+- システムの物理RAMが 16GB 未満の場合、スワップ設定が必要になる場合があります。
 
-### 6. Discord Bot の招待
+### Q: LLM の回答が遅い
+- Gemma 3 12B は非常に強力なモデルですが、RTX 3080 での推論には 10〜30秒ほどかかる場合があります。
+- `/stats` で GPU 1 (RTX 3080) が正しく使用されているか確認してください。
 
-Discord Developer Portal → OAuth2 → URL Generator:
-- **Scopes**: `bot`, `applications.commands`
-- **Bot Permissions**: `Send Messages`, `Use Slash Commands`, `Attach Files`, `Embed Links`
-
-生成されたURLでサーバーに招待。
-
-## 📁 プロジェクト構成
-
-```
-.
-├── bot/
-│   ├── __init__.py
-│   ├── main.py              # エントリーポイント
-│   ├── config.py             # 設定管理 (pydantic-settings)
-│   ├── cogs/
-│   │   ├── chat.py           # 会話コマンド
-│   │   ├── imagine.py        # 画像生成コマンド
-│   │   ├── utility.py        # ユーティリティコマンド
-│   │   └── admin.py          # 管理コマンド
-│   ├── services/
-│   │   ├── llm_service.py    # LLM推論エンジン
-│   │   ├── image_service.py  # 画像生成エンジン
-│   │   └── queue_service.py  # タスクキュー管理
-│   └── utils/
-│       ├── embed_builder.py  # Embed統一デザイン
-│       └── rate_limiter.py   # レート制限
-├── models/                    # MLモデル格納先
-├── cache/                     # 生成画像キャッシュ
-├── logs/                      # ログファイル
-├── scripts/
-│   └── download_models.sh    # モデルDLスクリプト
-├── Dockerfile                 # マルチステージビルド
-├── docker-compose.yml
-├── requirements.txt
-├── .env.example
-└── .gitignore
-```
-
-## ⚙️ 設定一覧
-
-すべて `.env` で設定可能。詳細は `.env.example` を参照。
-
-| 設定 | デフォルト | 説明 |
-|---|---|---|
-| `DISCORD_TOKEN` | — | Discord Bot Token（必須） |
-| `OWNER_ID` | — | Bot管理者のDiscord ID |
-| `SD_MODEL_ID` | `FLUX.1-schnell` | 画像生成モデルID |
-| `SD_GPU_DEVICE` | `0` | 画像生成用GPUインデックス |
-| `LLM_N_CTX` | `4096` | コンテキストウィンドウ |
-| `LLM_TEMPERATURE` | `0.7` | 生成温度 |
-| `SD_DEFAULT_STEPS` | `4` | 画像生成ステップ数 |
-| `RATE_LIMIT_PER_MINUTE` | `10` | ユーザーあたりのレート制限 |
-
-## 🔧 トラブルシューティング
-
-### CUDA out of memory (OOM) 対策
-
-**LLM (Ollama) 側:**
-```env
-LLM_N_CTX=2048     # コンテキストウィンドウを縮小
-LLM_MAX_TOKENS=512 # 最大トークン数を縮小
-```
-
-**画像生成 (Flux) 側:**
-FLUX.1-schnell は非常に重いモデルです。16GBのVRAMでもOOMになる場合、以下の対策が有効です（本リポジトリでは対策済みです）。
-- 4-bit量子化 (`bitsandbytes`) の利用
-- 推論時の dtype を `bfloat16` に統一
-- VAE と text_encoder_1 (CLIP) の CPU での実行（VRAMから退避）
-- VAE の Tiling と Slicing を有効化
-- `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` を設定
-
-### モデルのロードが遅い
-
-初回起動時は HuggingFace からモデルをダウンロードするため時間がかかります。
-事前に `scripts/download_models.sh` を実行してください。
-
-### GPU が認識されない
-
-```bash
-# Docker から GPU が見えるか確認
-docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi
-```
-
-### Slash Commands が表示されない
-
-Bot起動後、Discord側への同期に最大1時間かかることがあります。
-Botをサーバーから一度除外し、再招待すると即座に反映されます。
-
-## 📝 Docker を使わない場合
-
-```bash
-# Python 3.11 の仮想環境を作成
-python3.11 -m venv .venv
-source .venv/bin/activate
-
-# 依存関係インストール
-pip install -r requirements.txt
-
-# llama-cpp-python (CUDA対応) をビルド
-CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python==0.3.4
-
-# モデルダウンロード
-bash scripts/download_models.sh
-
-# 環境変数設定
-cp .env.example .env
-# .env を編集
-
-# 起動
-python -m bot.main
-```
+---
 
 ## 📄 ライセンス
 
