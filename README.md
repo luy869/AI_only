@@ -21,7 +21,6 @@
 
 ## 🏗️ アーキテクチャ
 
-```
 ┌─────────────────────────────────────────┐
 │           Dual GPU Architecture         │
 ├─────────────────┬───────────────────────┤
@@ -31,9 +30,10 @@
 │  画像生成          │  LLM推論              │
 │  FLUX.1-schnell   │  Gemma 3 12B          │
 │  4-bit量子化      │  Ollama               │
-│  ~10GB VRAM       │  ~8GB VRAM            │
+│  ~15GB VRAM       │  ~8GB VRAM            │
+│  ※VAE/CLIPはCPUへ │                       │
 └─────────────────┴───────────────────────┘
-```
+
 
 ## 📋 前提条件
 
@@ -168,12 +168,21 @@ Discord Developer Portal → OAuth2 → URL Generator:
 
 ## 🔧 トラブルシューティング
 
-### CUDA out of memory
+### CUDA out of memory (OOM) 対策
 
-```
+**LLM (Ollama) 側:**
+```env
 LLM_N_CTX=2048     # コンテキストウィンドウを縮小
 LLM_MAX_TOKENS=512 # 最大トークン数を縮小
 ```
+
+**画像生成 (Flux) 側:**
+FLUX.1-schnell は非常に重いモデルです。16GBのVRAMでもOOMになる場合、以下の対策が有効です（本リポジトリでは対策済みです）。
+- 4-bit量子化 (`bitsandbytes`) の利用
+- 推論時の dtype を `bfloat16` に統一
+- VAE と text_encoder_1 (CLIP) の CPU での実行（VRAMから退避）
+- VAE の Tiling と Slicing を有効化
+- `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` を設定
 
 ### モデルのロードが遅い
 

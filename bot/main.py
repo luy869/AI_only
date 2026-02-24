@@ -89,6 +89,7 @@ class Athena(commands.Bot):
         cog_modules = [
             "bot.cogs.chat",
             "bot.cogs.imagine",
+            "bot.cogs.upscale",
             "bot.cogs.utility",
             "bot.cogs.admin",
         ]
