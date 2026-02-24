@@ -76,24 +76,131 @@ FLUX.1-schnell に最適化されたパラメータを使用します。
 
 ---
 
-## 🚀 セットアップ
+## � 前提条件
 
-### 1. 準備
+- **OS**: Ubuntu 20.04+ / 対応Linuxディストリビューション
+- **Docker**: 24.0+
+- **Docker Compose**: v2.0+
+- **NVIDIA Driver**: 525+ (CUDA 11.8対応)
+- **NVIDIA Container Toolkit**: インストール済み
+- **Discord Bot Token**: [Discord Developer Portal](https://discord.com/developers/applications) で取得
+
+### NVIDIA Container Toolkit インストール
+
+```bash
+# Ubuntu / Debian
+distribution=$(. /etc/os-release; echo $ID$VERSION_ID)
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
+  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
+---
+
+## �🚀 セットアップ手順
+
+### 1. リポジトリ準備
+
 ```bash
 git clone https://github.com/luy869/AI_only.git athena
 cd athena
+```
+
+### 2. 環境変数設定
+
+```bash
 cp .env.example .env
 ```
 
-### 2. モデル取得 & 起動
+`.env` を編集して最低限以下を設定:
+
+```env
+DISCORD_TOKEN=your-bot-token-here
+OWNER_ID=your-discord-user-id
+```
+
+### 3. モデルのダウンロード
+
 ```bash
-# モデルの事前ロード（初回のみ）
 chmod +x scripts/download_models.sh
 ./scripts/download_models.sh
+```
 
-# 起動
+> ⚠️ 約8.5GB のダウンロードが発生します。初回のみ必要です。
+
+### 4. Docker ビルド & 起動
+
+```bash
 docker compose up --build -d
 ```
+
+### 5. ログ確認
+
+```bash
+docker compose logs -f athena
+```
+
+正常起動時のログ:
+```
+✦ Athena is online! Athena#1234 (ID: 123456789)
+  Guilds: 1
+🔄 Loading ML models in background …
+  ✓ LLM model loaded
+  ✓ Image generation model loaded
+  ✓ Queue workers started
+✅ All models loaded — Athena is fully operational
+```
+
+### 6. Discord Bot の招待
+
+Discord Developer Portal → OAuth2 → URL Generator:
+- **Scopes**: `bot`, `applications.commands`
+- **Bot Permissions**: `Send Messages`, `Use Slash Commands`, `Attach Files`, `Embed Links`
+
+生成されたURLでサーバーに招待。
+
+---
+
+## 📁 プロジェクト構成
+
+```
+.
+├── bot/
+│   ├── main.py               # エントリーポイント
+│   ├── config.py             # 設定管理
+│   ├── cogs/                 # コマンド実装 (chat, imagine etc.)
+│   ├── services/             # LLM/画像生成 エンジン
+│   └── utils/                # ユーティリティ (Embed作成, レート制限)
+├── models/                   # MLモデル格納先
+├── cache/                    # 生成画像キャッシュ
+├── scripts/
+│   └── download_models.sh   # モデルDLスクリプト
+├── Dockerfile                # マルチステージビルド
+├── docker-compose.yml
+├── .env.example
+└── requirements.txt
+```
+
+---
+
+## ⚙️ 設定一覧
+
+すべて `.env` で設定可能。詳細は `.env.example` を参照してください。
+
+| 設定 | デフォルト | 説明 |
+|---|---|---|
+| `DISCORD_TOKEN` | — | Discord Bot Token（必須） |
+| `OWNER_ID` | — | Bot管理者のDiscord ID |
+| `SD_MODEL_ID` | `FLUX.1-schnell` | 画像生成モデルID |
+| `SD_GPU_DEVICE` | `0` | 画像生成用GPUインデックス |
+| `LLM_N_CTX` | `4096` | コンテキストウィンドウ |
+| `LLM_TEMPERATURE` | `0.7` | 生成温度 |
+| `SD_DEFAULT_STEPS` | `4` | 画像生成ステップ数 |
+| `RATE_LIMIT_PER_MINUTE` | `10` | ユーザーあたりのレート制限 |
 
 ---
 
@@ -106,6 +213,36 @@ docker compose up --build -d
 ### Q: 推論が CPU で動いているように見える
 - `nvidia-smi` を実行し、コンテナからGPUが見えているか確認してください。
 - 環境変数 `SD_GPU_DEVICE` 等が正しく設定されているか確認してください。
+
+### Q: モデルのロードが遅い
+- 初回起動時は HuggingFace からモデルをダウンロードするため時間がかかります。
+- 事前に `scripts/download_models.sh` を実行してください。
+
+### Q: Slash Commands が表示されない
+- Bot起動後、Discord側への同期に最大1時間かかることがあります。
+- Botをサーバーから一度除外し、再招待すると即座に反映される場合があります。
+
+---
+
+## 📝 Docker を使わない場合
+
+```bash
+# Python 3.11 の仮想環境を作成
+python3.11 -m venv .venv
+source .venv/bin/activate
+
+# 依存関係インストール
+pip install -r requirements.txt
+
+# llama-cpp-python (CUDA対応) をビルド
+CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python
+
+# モデルダウンロード
+bash scripts/download_models.sh
+
+# 環境変数の設定後、起動
+python -m bot.main
+```
 
 ---
 
