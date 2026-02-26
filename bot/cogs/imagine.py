@@ -47,8 +47,8 @@ class UpscaleView(discord.ui.View):
         style=discord.ButtonStyle.secondary,
         custom_id="upscale_2x",
     )
-    async def upscale_2x(
-        self, interaction: discord.Interaction, button: discord.ui.Button
+    async def _process_upscale(
+        self, interaction: discord.Interaction, button: discord.ui.Button, scale: float
     ):
         # サービス準備チェック
         if self.bot.image_service is None or self.bot.queue_service is None:
@@ -60,7 +60,7 @@ class UpscaleView(discord.ui.View):
 
         # ボタンを無効化して更新
         button.disabled = True
-        button.label = "⌛ 拡大中..."
+        button.label = f"⌛ {scale}x 拡大中..."
         await interaction.message.edit(view=self)
 
         await interaction.response.defer(thinking=True)
@@ -80,18 +80,18 @@ class UpscaleView(discord.ui.View):
             result = await self.bot.queue_service.submit_image(
                 self.bot.image_service.upscale,
                 pil_image,
-                outscale=2.0,
+                outscale=scale,
             )
 
             # 結果を表示
             file = discord.File(str(result.path), filename=result.path.name)
             embed = make_embed(
-                "画像拡大完了",
+                f"画像拡大完了 ({scale}x)",
                 f"**元のプロンプト:** {self.prompt}",
                 colour=Colour.IMAGE,
                 emoji=EMOJI["imagine"],
                 fields=[
-                    ("倍率", "2.0x", True),
+                    ("倍率", f"{scale}x", True),
                     ("サイズ", f"{result.width}×{result.height}", True),
                     ("処理時間", f"{result.elapsed_seconds:.1f}秒 (CPU)", True),
                 ],
@@ -115,11 +115,31 @@ class UpscaleView(discord.ui.View):
         finally:
             # ボタンを元に戻す（再試行可能にするため。または終了ならそのまま）
             button.disabled = False
-            button.label = "🔍 拡大 (2x)"
+            button.label = f"🔍 拡大 ({scale:g}x)"
             try:
                 await interaction.message.edit(view=self)
             except discord.NotFound:
                 pass
+
+    @discord.ui.button(
+        label="🔍 拡大 (2x)",
+        style=discord.ButtonStyle.secondary,
+        custom_id="upscale_2x",
+    )
+    async def upscale_2x(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await self._process_upscale(interaction, button, 2.0)
+
+    @discord.ui.button(
+        label="🔍 拡大 (4x)",
+        style=discord.ButtonStyle.secondary,
+        custom_id="upscale_4x",
+    )
+    async def upscale_4x(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await self._process_upscale(interaction, button, 4.0)
 
 
 class ImagineCog(commands.Cog, name="Imagine"):
