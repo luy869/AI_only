@@ -106,6 +106,7 @@ class ChatCog(commands.Cog, name="Chat"):
                     if interaction.user.display_avatar
                     else None
                 ),
+                fields=[("質問", message[:1024], False)],
             )
             await interaction.followup.send(embed=embed)
 
@@ -254,6 +255,7 @@ class ChatCog(commands.Cog, name="Chat"):
                 result,
                 colour=Colour.INFO,
                 emoji=EMOJI["summarize"],
+                fields=[("対象", text[:1024], False)],
             )
             await interaction.followup.send(embed=embed)
 
@@ -319,6 +321,7 @@ class ChatCog(commands.Cog, name="Chat"):
                 result,
                 colour=Colour.PRIMARY,
                 emoji=EMOJI["code"],
+                fields=[("依頼内容", request[:1024], False)],
             )
             await interaction.followup.send(embed=embed)
 

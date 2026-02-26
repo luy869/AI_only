@@ -243,9 +243,3 @@ bash scripts/download_models.sh
 # 環境変数の設定後、起動
 python -m bot.main
 ```
-
----
-
-## 📄 ライセンス
-
-MIT License
